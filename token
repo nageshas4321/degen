@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+
+contract DegenToken is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+
+    struct Gun {
+        uint256 id;
+        uint256 price;
+        uint256 enumerate;
+    }
+
+    mapping(uint256 => Gun) public guns;
+    mapping(address => uint256) public userBalances;
+
+    uint256 public nextGunId;
+
+    constructor() ERC20("DEGEN", "DGN") Ownable(msg.sender) {
+        _addGun(100, 10);
+        _addGun(50, 20);
+        _addGun(30, 15);
+        _addGun(10, 25);
+    }
+
+    function _addGun(uint256 price, uint256 enumerate) internal {
+        uint256 gunId = nextGunId++;
+        guns[gunId] = Gun(gunId, price, enumerate);
+    }
+
+    function mintTokens(address account, uint256 amountToMint) public onlyOwner {
+        _mint(account, amountToMint);
+    }
+
+    function burnTokens(uint256 amountToBurn) public payable {
+        require(balanceOf(msg.sender) >= amountToBurn, "INSUFFICIENT FUNDS!!");
+        _burn(msg.sender, amountToBurn);
+        emit LogMessage("Burned tokens");
+    }
+
+    function transferTokens(address recipient, uint256 amount) external {
+        require(balanceOf(msg.sender) >= amount, "INSUFFICIENT FUNDS!!");
+        _transfer(msg.sender, recipient, amount);
+    }
+
+    function redeemGun(uint256 gunId, uint256 enumerateToRedeem) external payable {
+        require(enumerateToRedeem > 0, "Enumerate must be greater than zero");
+        require(guns[gunId].id != 0, "Gun with specified ID does not exist");
+        Gun storage gun = guns[gunId];
+        require(gun.enumerate >= enumerateToRedeem, "Insufficient Gun enumerate");
+
+        uint256 totalPrice = gun.price * enumerateToRedeem;
+        require(balanceOf(msg.sender) >= totalPrice, "INSUFFICIENT FUNDS!!");
+        
+        _burn(msg.sender, totalPrice);
+        userBalances[msg.sender] += enumerateToRedeem;
+        gun.enumerate -= enumerateToRedeem;
+
+        emit LogMessage("Redeemed Gun");
+    }
+}
